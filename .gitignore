@@ -31,3 +31,12 @@ build/
 
 ### VS Code ###
 .vscode/
+
+### Security - Never commit sensitive configuration ###
+.env
+application-local.properties
+application-*.properties
+**/secrets/
+**/*secret*
+**/*credential*
+**/*password*

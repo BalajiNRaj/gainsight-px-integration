@@ -101,10 +101,10 @@ db.extracted_events.find({status: "FAILED"})
 ### Connection String Examples
 ```properties
 # MongoDB Atlas (recommended)
-spring.data.mongodb.uri=mongodb+srv://gainsight_user:password@cluster0.xxxxx.mongodb.net/gainsightdb?retryWrites=true&w=majority
+spring.data.mongodb.uri=mongodb+srv://${MONGODB_USERNAME}:${MONGODB_PASSWORD}@cluster0.xxxxx.mongodb.net/gainsightdb?retryWrites=true&w=majority
 
 # Local MongoDB
-spring.data.mongodb.uri=mongodb://gainsight_user:password@localhost:27017/gainsightdb?authSource=admin
+spring.data.mongodb.uri=mongodb://${MONGODB_USERNAME}:${MONGODB_PASSWORD}@localhost:27017/gainsightdb?authSource=admin
 ```
 
 ### Essential MongoDB Commands

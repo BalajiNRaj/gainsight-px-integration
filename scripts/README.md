@@ -11,7 +11,7 @@ This script creates the necessary indexes and sample data for your MongoDB datab
 #### For MongoDB Atlas:
 ```bash
 # Connect to your Atlas cluster and run the script
-mongosh "mongodb+srv://username:password@cluster.mongodb.net/gainsightdb" --file setup-mongodb.js
+mongosh "mongodb+srv://${MONGODB_USERNAME}:${MONGODB_PASSWORD}@cluster.mongodb.net/gainsightdb" --file setup-mongodb.js
 ```
 
 #### For Local MongoDB:

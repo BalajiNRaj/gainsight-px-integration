@@ -227,7 +227,7 @@ db.extracted_events.aggregate([
 
 ```properties
 # MongoDB Configuration (MongoDB Atlas)
-spring.data.mongodb.uri=mongodb+srv://username:password@cluster.mongodb.net/gainsightdb?retryWrites=true&w=majority
+spring.data.mongodb.uri=mongodb+srv://${MONGODB_USERNAME}:${MONGODB_PASSWORD}@cluster.mongodb.net/gainsightdb?retryWrites=true&w=majority
 spring.data.mongodb.database=gainsightdb
 
 # Alternative local MongoDB configuration

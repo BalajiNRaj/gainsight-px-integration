@@ -236,7 +236,7 @@ docker-compose logs -f gainsight-app
 #    - Password: your_secure_password
 # 4. Whitelist your application's IP addresses
 # 5. Get your connection string:
-#    mongodb+srv://gainsight_user:your_secure_password@cluster0.xxxxx.mongodb.net/gainsightdb?retryWrites=true&w=majority
+#    mongodb+srv://${MONGODB_USERNAME}:${MONGODB_PASSWORD}@cluster0.xxxxx.mongodb.net/gainsightdb?retryWrites=true&w=majority
 ```
 
 ### Local MongoDB Setup
@@ -308,7 +308,7 @@ logging.level.org.example.gainsightapp=DEBUG
 #### Staging (application-staging.properties)
 ```properties
 # MongoDB Configuration - Atlas Staging
-spring.data.mongodb.uri=mongodb+srv://staging_user:password@staging-cluster.mongodb.net/gainsightdb_staging?retryWrites=true&w=majority
+spring.data.mongodb.uri=mongodb+srv://${MONGODB_USERNAME}:${MONGODB_PASSWORD}@staging-cluster.mongodb.net/gainsightdb_staging?retryWrites=true&w=majority
 spring.data.mongodb.database=gainsightdb_staging
 logging.level.org.example.gainsightapp=INFO
 ```
@@ -316,7 +316,7 @@ logging.level.org.example.gainsightapp=INFO
 #### Production (application-prod.properties)
 ```properties
 # MongoDB Configuration - Atlas Production
-spring.data.mongodb.uri=mongodb+srv://prod_user:password@prod-cluster.mongodb.net/gainsightdb?retryWrites=true&w=majority
+spring.data.mongodb.uri=mongodb+srv://${MONGODB_USERNAME}:${MONGODB_PASSWORD}@prod-cluster.mongodb.net/gainsightdb?retryWrites=true&w=majority
 spring.data.mongodb.database=gainsightdb
 logging.level.org.example.gainsightapp=WARN
 ```
@@ -486,7 +486,7 @@ db.extracted_events.find({"tenantId": "tenant-001"}).explain("executionStats")
 ### Application Tuning
 ```properties
 # MongoDB connection tuning
-spring.data.mongodb.uri=mongodb+srv://user:pass@cluster.mongodb.net/gainsightdb?maxPoolSize=20&minPoolSize=5&maxIdleTimeMS=30000
+spring.data.mongodb.uri=mongodb+srv://${MONGODB_USERNAME}:${MONGODB_PASSWORD}@cluster.mongodb.net/gainsightdb?maxPoolSize=20&minPoolSize=5&maxIdleTimeMS=30000
 
 # HTTP client tuning
 gainsight.px.default.timeout-seconds=60
