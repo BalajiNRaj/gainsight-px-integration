@@ -11,7 +11,7 @@ This guide provides step-by-step instructions for deploying and operating the Ga
 - **Memory**: Minimum 512MB RAM, Recommended 2GB+
 - **Storage**: 1GB+ for application and logs
 - **Network**: Outbound HTTPS access to api.aptrinsic.com
-- **Database**: H2 (development) or PostgreSQL/MySQL (production)
+- **Database**: MongoDB Atlas (recommended) or local MongoDB installation
 
 ### Dependencies
 - Maven 3.6+
@@ -53,19 +53,17 @@ sudo chown -R gainsight:gainsight /opt/gainsight-app
 ```bash
 # Create production configuration
 sudo tee /opt/gainsight-app/config/application-prod.properties << EOF
-# Database Configuration (PostgreSQL example)
-spring.datasource.url=jdbc:postgresql://localhost:5432/gainsightdb
-spring.datasource.username=\${DB_USERNAME:gainsight_user}
-spring.datasource.password=\${DB_PASSWORD}
-spring.datasource.driver-class-name=org.postgresql.Driver
+# MongoDB Configuration (MongoDB Atlas)
+spring.data.mongodb.uri=mongodb+srv://\${MONGO_USERNAME:gainsight_user}:\${MONGO_PASSWORD}@\${MONGO_CLUSTER}/gainsightdb?retryWrites=true&w=majority
+spring.data.mongodb.database=gainsightdb
 
-# JPA Configuration
-spring.jpa.database-platform=org.hibernate.dialect.PostgreSQLDialect
-spring.jpa.hibernate.ddl-auto=validate
-spring.jpa.show-sql=false
-
-# Security
-spring.h2.console.enabled=false
+# Alternative local MongoDB configuration
+# spring.data.mongodb.host=localhost
+# spring.data.mongodb.port=27017
+# spring.data.mongodb.database=gainsightdb
+# spring.data.mongodb.username=gainsight_user
+# spring.data.mongodb.password=\${MONGO_PASSWORD}
+# spring.data.mongodb.authentication-database=admin
 
 # Gainsight PX Configuration
 gainsight.px.default.api-url=https://api.aptrinsic.com
@@ -105,8 +103,9 @@ StandardError=journal
 SyslogIdentifier=gainsight-app
 
 # Environment variables
-Environment=DB_USERNAME=gainsight_user
-Environment=DB_PASSWORD=your_secure_password
+Environment=MONGO_USERNAME=gainsight_user
+Environment=MONGO_PASSWORD=your_secure_password
+Environment=MONGO_CLUSTER=your_atlas_cluster.mongodb.net
 Environment=JAVA_OPTS=-Xmx1g -Xms512m
 
 [Install]
@@ -185,8 +184,9 @@ services:
       - "8080:8080"
     environment:
       - SPRING_PROFILES_ACTIVE=prod
-      - DB_USERNAME=gainsight_user
-      - DB_PASSWORD=${DB_PASSWORD}
+      - MONGO_USERNAME=gainsight_user
+      - MONGO_PASSWORD=${MONGO_PASSWORD}
+      - MONGO_CLUSTER=${MONGO_CLUSTER}
     volumes:
       - ./logs:/app/logs
       - ./config:/app/config
@@ -198,16 +198,17 @@ services:
       retries: 3
       start_period: 60s
     depends_on:
-      - postgres
+      - mongodb
 
-  postgres:
-    image: postgres:13
+  mongodb:
+    image: mongo:latest
     environment:
-      - POSTGRES_DB=gainsightdb
+      - MONGO_INITDB_ROOT_USERNAME=admin
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_ROOT_PASSWORD}
       - POSTGRES_USER=gainsight_user
       - POSTGRES_PASSWORD=${DB_PASSWORD}
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - mongodb_data:/data/db
     restart: unless-stopped
 
 volumes:
@@ -226,42 +227,55 @@ docker-compose logs -f gainsight-app
 
 ## 🗄️ Database Setup
 
-### PostgreSQL Setup
-```sql
--- Create database and user
-CREATE DATABASE gainsightdb;
-CREATE USER gainsight_user WITH PASSWORD 'your_secure_password';
-GRANT ALL PRIVILEGES ON DATABASE gainsightdb TO gainsight_user;
-
--- Connect to gainsightdb and grant schema permissions
-\c gainsightdb
-GRANT ALL ON SCHEMA public TO gainsight_user;
-GRANT ALL ON ALL TABLES IN SCHEMA public TO gainsight_user;
-GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO gainsight_user;
-```
-
-### MySQL Setup
-```sql
--- Create database and user
-CREATE DATABASE gainsightdb CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-CREATE USER 'gainsight_user'@'%' IDENTIFIED BY 'your_secure_password';
-GRANT ALL PRIVILEGES ON gainsightdb.* TO 'gainsight_user'@'%';
-FLUSH PRIVILEGES;
-```
-
-### Schema Migration
+### MongoDB Atlas Setup (Recommended)
 ```bash
-# Initial schema creation (first deployment)
-# Set spring.jpa.hibernate.ddl-auto=create-drop for first run
-# Then change to spring.jpa.hibernate.ddl-auto=validate
+# 1. Create MongoDB Atlas account at https://cloud.mongodb.com
+# 2. Create a new cluster
+# 3. Create a database user:
+#    - Username: gainsight_user
+#    - Password: your_secure_password
+# 4. Whitelist your application's IP addresses
+# 5. Get your connection string:
+#    mongodb+srv://gainsight_user:your_secure_password@cluster0.xxxxx.mongodb.net/gainsightdb?retryWrites=true&w=majority
+```
 
-# For subsequent deployments, use migration scripts
-# Example migration script:
-cat > db/migration/V1_1__add_index.sql << EOF
-CREATE INDEX idx_tenant_id ON extracted_events(tenant_id);
-CREATE INDEX idx_extracted_at ON extracted_events(extracted_at);
-CREATE INDEX idx_status ON extracted_events(status);
-EOF
+### Local MongoDB Setup
+```bash
+# Install MongoDB (macOS with Homebrew)
+brew tap mongodb/brew
+brew install mongodb-community
+
+# Start MongoDB service
+brew services start mongodb/brew/mongodb-community
+
+# Create database and user
+mongosh
+use gainsightdb
+db.createUser({
+  user: "gainsight_user",
+  pwd: "your_secure_password",
+  roles: [
+    { role: "readWrite", db: "gainsightdb" }
+  ]
+})
+```
+
+### MongoDB Indexes
+```javascript
+// Connect to your MongoDB instance
+use gainsightdb
+
+// Create indexes for tenant_configurations collection
+db.tenant_configurations.createIndex({ "tenantId": 1 }, { unique: true })
+db.tenant_configurations.createIndex({ "active": 1 })
+db.tenant_configurations.createIndex({ "lastAttemptedExtraction": 1 })
+
+// Create indexes for extracted_events collection
+db.extracted_events.createIndex({ "tenantId": 1 })
+db.extracted_events.createIndex({ "eventId": 1 })
+db.extracted_events.createIndex({ "extractedAt": 1 })
+db.extracted_events.createIndex({ "status": 1 })
+db.extracted_events.createIndex({ "tenantId": 1, "extractedAt": 1 })
 ```
 
 ## 🔧 Configuration Management
@@ -269,8 +283,9 @@ EOF
 ### Environment Variables
 ```bash
 # Required environment variables
-export DB_USERNAME=gainsight_user
-export DB_PASSWORD=your_secure_password
+export MONGO_USERNAME=gainsight_user
+export MONGO_PASSWORD=your_secure_password
+export MONGO_CLUSTER=your_atlas_cluster.mongodb.net
 export SPRING_PROFILES_ACTIVE=prod
 
 # Optional environment variables
@@ -283,24 +298,26 @@ export LOG_LEVEL=INFO
 
 #### Development (application-dev.properties)
 ```properties
-spring.datasource.url=jdbc:h2:mem:gainsightdb
-spring.jpa.show-sql=true
-spring.h2.console.enabled=true
+# MongoDB Configuration - Local Development
+spring.data.mongodb.host=localhost
+spring.data.mongodb.port=27017
+spring.data.mongodb.database=gainsightdb_dev
 logging.level.org.example.gainsightapp=DEBUG
 ```
 
 #### Staging (application-staging.properties)
 ```properties
-spring.datasource.url=jdbc:postgresql://staging-db:5432/gainsightdb
-spring.jpa.hibernate.ddl-auto=validate
+# MongoDB Configuration - Atlas Staging
+spring.data.mongodb.uri=mongodb+srv://staging_user:password@staging-cluster.mongodb.net/gainsightdb_staging?retryWrites=true&w=majority
+spring.data.mongodb.database=gainsightdb_staging
 logging.level.org.example.gainsightapp=INFO
 ```
 
 #### Production (application-prod.properties)
 ```properties
-spring.datasource.url=jdbc:postgresql://prod-db:5432/gainsightdb
-spring.jpa.hibernate.ddl-auto=validate
-spring.h2.console.enabled=false
+# MongoDB Configuration - Atlas Production
+spring.data.mongodb.uri=mongodb+srv://prod_user:password@prod-cluster.mongodb.net/gainsightdb?retryWrites=true&w=majority
+spring.data.mongodb.database=gainsightdb
 logging.level.org.example.gainsightapp=WARN
 ```
 
@@ -362,8 +379,9 @@ echo "*/5 * * * * /opt/gainsight-app/monitor.sh" | crontab -
 
 ### Database Backup
 ```bash
-# PostgreSQL backup
-pg_dump -h localhost -U gainsight_user gainsightdb > backup_$(date +%Y%m%d_%H%M%S).sql
+# MongoDB Atlas backup (automated by Atlas)
+# Manual backup using mongodump
+mongodump --uri="mongodb+srv://username:password@cluster.mongodb.net/gainsightdb" --out="/path/to/backup/$(date +%Y%m%d_%H%M%S)"
 
 # Automated backup script
 cat > /opt/gainsight-app/backup.sh << 'EOF'
@@ -374,13 +392,13 @@ DATE=$(date +%Y%m%d_%H%M%S)
 mkdir -p "$BACKUP_DIR"
 
 # Database backup
-pg_dump -h localhost -U gainsight_user gainsightdb > "$BACKUP_DIR/db_backup_$DATE.sql"
+mongodump --uri="$MONGODB_URI" --out="$BACKUP_DIR/db_backup_$DATE"
 
 # Configuration backup
 cp -r /opt/gainsight-app/config "$BACKUP_DIR/config_backup_$DATE"
 
 # Clean up old backups (keep last 7 days)
-find "$BACKUP_DIR" -name "*.sql" -mtime +7 -delete
+find "$BACKUP_DIR" -name "db_backup_*" -mtime +7 -exec rm -rf {} \;
 find "$BACKUP_DIR" -name "config_backup_*" -mtime +7 -exec rm -rf {} \;
 EOF
 
@@ -396,7 +414,8 @@ echo "0 2 * * * /opt/gainsight-app/backup.sh" | crontab -
 sudo systemctl stop gainsight-app
 sudo systemctl start gainsight-app
 
-# Database recovery (PostgreSQL)
+# Database recovery (MongoDB)
+mongorestore --uri="$MONGODB_URI" /path/to/backup/directory
 sudo systemctl stop gainsight-app
 dropdb gainsightdb
 createdb gainsightdb
@@ -447,22 +466,27 @@ export JAVA_OPTS="-Xmx2g -Xms1g -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:+Print
 ```
 
 ### Database Tuning
-```sql
--- PostgreSQL optimization
-CREATE INDEX CONCURRENTLY idx_tenant_extracted_at ON extracted_events(tenant_id, extracted_at);
-CREATE INDEX CONCURRENTLY idx_status_retry ON extracted_events(status, retry_count);
+```javascript
+// MongoDB optimization - run in mongosh
+use gainsightdb
 
--- Analyze tables periodically
-ANALYZE tenant_configurations;
-ANALYZE extracted_events;
+// Analyze collection statistics
+db.tenant_configurations.getIndexes()
+db.extracted_events.getIndexes()
+
+// Check collection stats
+db.stats()
+db.tenant_configurations.stats()
+db.extracted_events.stats()
+
+// Optimize queries with explain
+db.extracted_events.find({"tenantId": "tenant-001"}).explain("executionStats")
 ```
 
 ### Application Tuning
 ```properties
-# Connection pool tuning
-spring.datasource.hikari.maximum-pool-size=20
-spring.datasource.hikari.minimum-idle=5
-spring.datasource.hikari.connection-timeout=30000
+# MongoDB connection tuning
+spring.data.mongodb.uri=mongodb+srv://user:pass@cluster.mongodb.net/gainsightdb?maxPoolSize=20&minPoolSize=5&maxIdleTimeMS=30000
 
 # HTTP client tuning
 gainsight.px.default.timeout-seconds=60
@@ -542,8 +566,8 @@ java -jar gainsight-app.jar --spring.profiles.active=prod --debug
 
 #### Database Connection Issues
 ```bash
-# Test database connectivity
-psql -h localhost -U gainsight_user -d gainsightdb -c "SELECT 1;"
+# Test MongoDB connectivity
+mongosh "mongodb+srv://username:password@cluster.mongodb.net/gainsightdb"
 
 # Check connection pool
 curl http://localhost:8080/api/monitoring/status | jq .database

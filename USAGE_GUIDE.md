@@ -21,7 +21,6 @@ mvn spring-boot:run
 
 ### 2. Access Key Endpoints
 - **Application**: http://localhost:8080
-- **H2 Database Console**: http://localhost:8080/h2-console
 - **Health Check**: http://localhost:8080/api/monitoring/health
 - **All Tenants**: http://localhost:8080/api/tenants
 
@@ -194,27 +193,32 @@ done
 
 ### 4. Database Operations
 
-```sql
--- Access H2 Console at http://localhost:8080/h2-console
--- JDBC URL: jdbc:h2:mem:gainsightdb
--- Username: sa
--- Password: (leave empty)
+```javascript
+// Connect to MongoDB
+mongosh "mongodb+srv://username:password@cluster.mongodb.net/gainsightdb"
 
--- View all tenant configurations
-SELECT * FROM tenant_configurations;
+// View all tenant configurations
+db.tenant_configurations.find().pretty()
 
--- View extracted events
-SELECT * FROM extracted_events ORDER BY extracted_at DESC LIMIT 10;
+// View extracted events
+db.extracted_events.find().sort({extractedAt: -1}).limit(10).pretty()
 
--- Check extraction statistics
-SELECT 
-  tenant_id,
-  COUNT(*) as total_events,
-  MAX(extracted_at) as last_extraction,
-  COUNT(CASE WHEN status = 'PROCESSED' THEN 1 END) as processed_events,
-  COUNT(CASE WHEN status = 'FAILED' THEN 1 END) as failed_events
-FROM extracted_events 
-GROUP BY tenant_id;
+// Check extraction statistics
+db.extracted_events.aggregate([
+  {
+    $group: {
+      _id: "$tenantId",
+      total_events: { $sum: 1 },
+      last_extraction: { $max: "$extractedAt" },
+      processed_events: {
+        $sum: { $cond: [{ $eq: ["$status", "PROCESSED"] }, 1, 0] }
+      },
+      failed_events: {
+        $sum: { $cond: [{ $eq: ["$status", "FAILED"] }, 1, 0] }
+      }
+    }
+  }
+])
 ```
 
 ## Configuration Guide
@@ -222,20 +226,17 @@ GROUP BY tenant_id;
 ### Application Properties
 
 ```properties
-# Database Configuration
-spring.datasource.url=jdbc:h2:mem:gainsightdb
-spring.datasource.driverClassName=org.h2.Driver
-spring.datasource.username=sa
-spring.datasource.password=
+# MongoDB Configuration (MongoDB Atlas)
+spring.data.mongodb.uri=mongodb+srv://username:password@cluster.mongodb.net/gainsightdb?retryWrites=true&w=majority
+spring.data.mongodb.database=gainsightdb
 
-# JPA Configuration
-spring.jpa.database-platform=org.hibernate.dialect.H2Dialect
-spring.jpa.hibernate.ddl-auto=create-drop
-spring.jpa.show-sql=false
-
-# H2 Console (Development only)
-spring.h2.console.enabled=true
-spring.h2.console.path=/h2-console
+# Alternative local MongoDB configuration
+# spring.data.mongodb.host=localhost
+# spring.data.mongodb.port=27017
+# spring.data.mongodb.database=gainsightdb
+# spring.data.mongodb.username=gainsight_user
+# spring.data.mongodb.password=password
+# spring.data.mongodb.authentication-database=admin
 
 # Gainsight PX Default Configuration
 gainsight.px.default.api-url=https://api.aptrinsic.com
@@ -245,6 +246,7 @@ gainsight.px.default.max-retry-attempts=3
 # Logging Configuration
 logging.level.org.example.gainsightapp=INFO
 logging.level.org.springframework.retry=DEBUG
+logging.level.org.springframework.data.mongodb.core.MongoTemplate=INFO
 logging.pattern.file=%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n
 ```
 
@@ -253,19 +255,20 @@ logging.pattern.file=%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %m
 #### Development
 ```properties
 # application-dev.properties
-spring.jpa.show-sql=true
+# MongoDB Configuration - Local Development
+spring.data.mongodb.host=localhost
+spring.data.mongodb.port=27017
+spring.data.mongodb.database=gainsightdb_dev
 logging.level.org.example.gainsightapp=DEBUG
-spring.h2.console.enabled=true
+logging.level.org.springframework.data.mongodb.core.MongoTemplate=DEBUG
 ```
 
 #### Production
 ```properties
 # application-prod.properties
-spring.datasource.url=jdbc:postgresql://localhost:5432/gainsightdb
-spring.datasource.username=${DB_USERNAME}
-spring.datasource.password=${DB_PASSWORD}
-spring.jpa.hibernate.ddl-auto=validate
-spring.h2.console.enabled=false
+# MongoDB Configuration - Atlas Production
+spring.data.mongodb.uri=mongodb+srv://${MONGO_USERNAME}:${MONGO_PASSWORD}@${MONGO_CLUSTER}/gainsightdb?retryWrites=true&w=majority
+spring.data.mongodb.database=gainsightdb
 logging.level.org.example.gainsightapp=WARN
 ```
 
@@ -489,18 +492,22 @@ mvn dependency:analyze
 ### Deployment Steps
 
 1. **Database Setup**
-   ```sql
-   -- Create production database
-   CREATE DATABASE gainsightdb;
-   CREATE USER gainsight_user WITH PASSWORD 'secure_password';
-   GRANT ALL PRIVILEGES ON DATABASE gainsightdb TO gainsight_user;
+   ```javascript
+   // Connect to MongoDB
+   mongosh "mongodb+srv://username:password@cluster.mongodb.net/gainsightdb"
+   
+   // Create database and indexes
+   use gainsightdb
+   db.tenant_configurations.createIndex({"tenantId": 1}, {unique: true})
+   db.extracted_events.createIndex({"tenantId": 1})
    ```
 
 2. **Application Configuration**
    ```bash
    # Set environment variables
-   export DB_USERNAME=gainsight_user
-   export DB_PASSWORD=secure_password
+   export MONGO_USERNAME=gainsight_user
+   export MONGO_PASSWORD=secure_password
+   export MONGO_CLUSTER=your_cluster.mongodb.net
    export SPRING_PROFILES_ACTIVE=prod
    ```
 

@@ -41,6 +41,7 @@ public class TenantManagementService {
             throw new IllegalArgumentException("Invalid Gainsight PX credentials for tenant: " + tenant.getTenantId());
         }
         
+        tenant.onCreate();
         TenantConfiguration savedTenant = tenantRepository.save(tenant);
         logger.info("Successfully created tenant configuration: {}", savedTenant.getTenantId());
         
@@ -73,6 +74,7 @@ public class TenantManagementService {
             }
         }
         
+        existingTenant.onUpdate();
         TenantConfiguration savedTenant = tenantRepository.save(existingTenant);
         logger.info("Successfully updated tenant configuration: {}", savedTenant.getTenantId());
         

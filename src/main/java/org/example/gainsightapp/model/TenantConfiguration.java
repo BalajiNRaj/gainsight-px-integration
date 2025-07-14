@@ -1,20 +1,20 @@
 package org.example.gainsightapp.model;
 
-import jakarta.persistence.*;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.mapping.Document;
+import org.springframework.data.mongodb.core.index.Indexed;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import java.time.LocalDateTime;
 
-@Entity
-@Table(name = "tenant_configurations")
+@Document(collection = "tenant_configurations")
 public class TenantConfiguration {
     
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    private String id;
     
     @NotBlank
-    @Column(unique = true)
+    @Indexed(unique = true)
     private String tenantId;
     
     @NotBlank
@@ -43,19 +43,18 @@ public class TenantConfiguration {
     private String lastProcessedScrollId;
     
     // Timestamps
-    @Column(updatable = false)
     private LocalDateTime createdAt;
-    
     private LocalDateTime updatedAt;
     
-    @PrePersist
-    protected void onCreate() {
-        createdAt = LocalDateTime.now();
+    // Constructor callback methods
+    public void onCreate() {
+        if (createdAt == null) {
+            createdAt = LocalDateTime.now();
+        }
         updatedAt = LocalDateTime.now();
     }
     
-    @PreUpdate
-    protected void onUpdate() {
+    public void onUpdate() {
         updatedAt = LocalDateTime.now();
     }
     
@@ -67,11 +66,12 @@ public class TenantConfiguration {
         this.companyName = companyName;
         this.apiKey = apiKey;
         this.apiUrl = apiUrl;
+        onCreate();
     }
     
     // Getters and Setters
-    public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
+    public String getId() { return id; }
+    public void setId(String id) { this.id = id; }
     
     public String getTenantId() { return tenantId; }
     public void setTenantId(String tenantId) { this.tenantId = tenantId; }

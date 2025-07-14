@@ -1,44 +1,41 @@
 package org.example.gainsightapp.model;
 
-import jakarta.persistence.*;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.mapping.Document;
+import org.springframework.data.mongodb.core.index.Indexed;
 import java.time.LocalDateTime;
 
-@Entity
-@Table(name = "extracted_events")
+@Document(collection = "extracted_events")
 public class ExtractedEvent {
     
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    private String id;
     
-    @Column(nullable = false)
+    @Indexed
     private String tenantId;
     
-    @Column(nullable = false)
+    @Indexed
     private String eventId;
     
-    @Column(nullable = false)
     private String eventType; // CUSTOM or STANDARD
-    
-    @Column(nullable = false)
     private String eventName;
-    
-    @Column(columnDefinition = "TEXT")
     private String eventData; // JSON string
-    
     private LocalDateTime eventTimestamp;
+    
+    @Indexed
     private LocalDateTime extractedAt;
     
     // Processing status
-    @Enumerated(EnumType.STRING)
+    @Indexed
     private ProcessingStatus status = ProcessingStatus.EXTRACTED;
     
     private String processingError;
     private Integer retryCount = 0;
     
-    @PrePersist
-    protected void onCreate() {
-        extractedAt = LocalDateTime.now();
+    public void onCreate() {
+        if (extractedAt == null) {
+            extractedAt = LocalDateTime.now();
+        }
     }
     
     public enum ProcessingStatus {
@@ -56,11 +53,12 @@ public class ExtractedEvent {
         this.eventName = eventName;
         this.eventData = eventData;
         this.eventTimestamp = eventTimestamp;
+        onCreate();
     }
     
     // Getters and Setters
-    public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
+    public String getId() { return id; }
+    public void setId(String id) { this.id = id; }
     
     public String getTenantId() { return tenantId; }
     public void setTenantId(String tenantId) { this.tenantId = tenantId; }

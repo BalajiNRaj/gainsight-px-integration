@@ -16,7 +16,6 @@ mvn clean package
 ## 🔗 Key URLs
 - **Application**: http://localhost:8080
 - **Health Check**: http://localhost:8080/api/monitoring/health
-- **Database Console**: http://localhost:8080/h2-console
 - **All Tenants**: http://localhost:8080/api/tenants
 
 ## 📋 Essential API Commands
@@ -61,33 +60,102 @@ curl http://localhost:8080/api/monitoring/status
 
 ## 🗄️ Database Quick Access
 
-**H2 Console**: http://localhost:8080/h2-console
-- **JDBC URL**: `jdbc:h2:mem:gainsightdb`
-- **Username**: `sa`
-- **Password**: (empty)
+**MongoDB Atlas Dashboard**: Access through your MongoDB Atlas account
+- **Database**: gainsightdb
+- **Collections**: tenant_configurations, extracted_events
 
-### Useful SQL Queries
-```sql
--- View all tenants
-SELECT * FROM tenant_configurations;
+### Useful MongoDB Queries
+```javascript
+// View all tenants
+db.tenant_configurations.find()
 
--- View recent events
-SELECT * FROM extracted_events ORDER BY extracted_at DESC LIMIT 10;
+// View recent events
+db.extracted_events.find().sort({extractedAt: -1}).limit(10)
 
--- Check extraction stats by tenant
-SELECT tenant_id, COUNT(*) as events, MAX(extracted_at) as last_extraction 
-FROM extracted_events GROUP BY tenant_id;
+// Check extraction stats by tenant
+db.extracted_events.aggregate([
+  {$group: {
+    _id: "$tenantId", 
+    events: {$sum: 1}, 
+    lastExtraction: {$max: "$extractedAt"}
+  }}
+])
 
--- View failed extractions
-SELECT * FROM extracted_events WHERE status = 'FAILED';
+// View failed extractions
+db.extracted_events.find({status: "FAILED"})
+```
+
+## 🗄️ MongoDB Atlas Setup
+
+### Quick Atlas Setup
+```bash
+# 1. Sign up at https://cloud.mongodb.com
+# 2. Create cluster (Free tier: M0 Sandbox)
+# 3. Create database user:
+#    - Username: gainsight_user
+#    - Password: [generate secure password]
+# 4. Network Access: Add IP addresses or 0.0.0.0/0 (less secure)
+# 5. Get connection string from "Connect" button
+```
+
+### Connection String Examples
+```properties
+# MongoDB Atlas (recommended)
+spring.data.mongodb.uri=mongodb+srv://gainsight_user:password@cluster0.xxxxx.mongodb.net/gainsightdb?retryWrites=true&w=majority
+
+# Local MongoDB
+spring.data.mongodb.uri=mongodb://gainsight_user:password@localhost:27017/gainsightdb?authSource=admin
+```
+
+### Essential MongoDB Commands
+```javascript
+// Connect to MongoDB
+mongosh "your_connection_string"
+
+// Basic operations
+use gainsightdb
+show collections
+db.tenant_configurations.countDocuments()
+db.extracted_events.countDocuments()
+
+// View recent events
+db.extracted_events.find().sort({extractedAt: -1}).limit(5)
+
+// Find failed extractions
+db.extracted_events.find({status: "FAILED"})
+
+// Check tenant status
+db.tenant_configurations.find({active: true})
+
+// Clean old events (older than 30 days)
+db.extracted_events.deleteMany({
+  extractedAt: {
+    $lt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+  }
+})
+```
+
+### MongoDB Performance Tips
+```javascript
+// Create essential indexes
+db.tenant_configurations.createIndex({tenantId: 1}, {unique: true})
+db.extracted_events.createIndex({tenantId: 1, extractedAt: 1})
+db.extracted_events.createIndex({status: 1})
+
+// Check query performance
+db.extracted_events.find({tenantId: "tenant-001"}).explain("executionStats")
+
+// Monitor collection stats
+db.stats()
+db.extracted_events.stats()
 ```
 
 ## ⚙️ Configuration Files
 
 ### Main Config: `application.properties`
 ```properties
-# Database
-spring.datasource.url=jdbc:h2:mem:gainsightdb
+# MongoDB
+spring.data.mongodb.uri=mongodb+srv://username:password@cluster.mongodb.net/gainsightdb
 
 # Gainsight PX
 gainsight.px.default.api-url=https://api.aptrinsic.com
@@ -123,9 +191,10 @@ grep "extraction" logs/application.log
 
 ### Reset Data
 ```bash
-# Restart application (H2 is in-memory, so data resets)
-# Or access H2 console and run:
-# DROP ALL OBJECTS;
+# Connect to MongoDB and drop collections
+# Use MongoDB Compass or mongo shell:
+# db.tenant_configurations.drop()
+# db.extracted_events.drop()
 ```
 
 ## 📊 Monitoring Commands
@@ -195,7 +264,7 @@ netstat -an | grep 8080
 - **Log Location**: `logs/application.log`
 - **Config Location**: `src/main/resources/application.properties`
 - **Main Application Class**: `org.example.gainsightapp.app.GainsightAppApplication`
-- **Database**: H2 (in-memory for development)
+- **Database**: MongoDB Atlas (cloud) or local MongoDB instance
 - **Default Port**: 8080
 
 ---

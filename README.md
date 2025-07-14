@@ -1,6 +1,6 @@
 # Gainsight PX Multi-Tenant Integration
 
-A robust Java Spring Boot application for periodically extracting events from multiple Gainsight PX accounts with comprehensive error handling, retry mechanisms, and multi-tenancy support.
+A robust Java Spring Boot application for periodically extracting events from multiple Gainsight PX accounts with comprehensive error handling, retry mechanisms, and multi-tenancy support. **Built with MongoDB for flexible, scalable data storage.**
 
 ## Features
 
@@ -27,8 +27,15 @@ A robust Java Spring Boot application for periodically extracting events from mu
 ### 📈 Scalability & Performance
 - Concurrent extraction for multiple tenants
 - Configurable thread pool for parallel processing
-- Efficient database storage with JPA/Hibernate
+- Efficient document storage with MongoDB
 - Memory-optimized event processing
+
+### 🗄️ MongoDB Integration
+- **MongoDB Atlas Support** - Cloud-ready with managed MongoDB hosting
+- **Flexible Document Storage** - JSON-native data modeling for events and configurations
+- **Optimized Indexing** - Pre-configured indexes for high-performance queries
+- **Horizontal Scaling** - Built-in support for MongoDB's scaling capabilities
+- **Schema Flexibility** - Easy data model evolution without migrations
 
 ## Architecture
 
@@ -43,8 +50,8 @@ A robust Java Spring Boot application for periodically extracting events from mu
 
 ### Database Schema
 
-- `tenant_configurations` - Tenant settings and credentials
-- `extracted_events` - Extracted event data with processing status
+- `tenant_configurations` - MongoDB collection for tenant settings and credentials
+- `extracted_events` - MongoDB collection for extracted event data with processing status
 
 ## 📚 Documentation
 
@@ -67,6 +74,7 @@ This project includes comprehensive documentation:
 - Java 21 or higher
 - Maven 3.6+
 - Spring Boot 3.5.3
+- MongoDB Atlas account or local MongoDB installation
 
 ### Installation
 
@@ -84,10 +92,9 @@ mvn spring-boot:run
 Update `src/main/resources/application.properties`:
 
 ```properties
-# Database Configuration
-spring.datasource.url=jdbc:h2:mem:gainsightdb
-spring.datasource.username=sa
-spring.datasource.password=password
+# MongoDB Configuration (MongoDB Atlas)
+spring.data.mongodb.uri=mongodb+srv://username:password@cluster.mongodb.net/gainsightdb?retryWrites=true&w=majority
+spring.data.mongodb.database=gainsightdb
 
 # Default Gainsight PX Configuration
 gainsight.px.api-url=https://api.aptrinsic.com
@@ -118,7 +125,8 @@ gainsight.px.api-key=your-api-key-here
 
 ### Development Tools
 
-- `GET /h2-console` - H2 Database Console (development only)
+- `GET /api/monitoring/health` - Application health check
+- `GET /api/monitoring/status` - Detailed system status
 
 ## Usage Examples
 
@@ -240,7 +248,8 @@ curl http://localhost:8080/api/tenants/company-123/stats
 ### Debugging
 
 - Enable debug logging: `logging.level.org.example.gainsightapp=DEBUG`
-- Check H2 console for database state
+- Check MongoDB collections and connection status
+- Review application logs for detailed error information
 - Use monitoring endpoints for system health
 
 ## Contributing

@@ -200,6 +200,7 @@ public class GainsightEventExtractionService {
                 extractedEvent.setEventName(extractEventName(event));
                 extractedEvent.setEventData(objectMapper.writeValueAsString(event));
                 extractedEvent.setEventTimestamp(extractEventTimestamp(event));
+                extractedEvent.onCreate();
                 
                 extractedEvents.add(extractedEvent);
                 
