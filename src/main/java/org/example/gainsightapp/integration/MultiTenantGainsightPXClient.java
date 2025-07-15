@@ -154,16 +154,23 @@ public class MultiTenantGainsightPXClient {
             
             // Extract common fields
             if (root.has("scrollId")) {
-                gainsightResponse.setScrollId(root.get("scrollId").asText());
+                JsonNode scrollIdNode = root.get("scrollId");
+                if (!scrollIdNode.isNull()) {
+                    gainsightResponse.setScrollId(scrollIdNode.asText());
+                }
             }
             
             if (root.has("hasMore")) {
                 gainsightResponse.setHasMore(root.get("hasMore").asBoolean());
             }
             
-            // Extract data array
+            // Extract data array - handle multiple possible field names
             if (root.has("data") && root.get("data").isArray()) {
                 gainsightResponse.setData(root.get("data"));
+            } else if (root.has("customEvents") && root.get("customEvents").isArray()) {
+                gainsightResponse.setData(root.get("customEvents"));
+            } else if (root.has("users") && root.get("users").isArray()) {
+                gainsightResponse.setData(root.get("users"));
             } else if (root.isArray()) {
                 gainsightResponse.setData(root);
             }

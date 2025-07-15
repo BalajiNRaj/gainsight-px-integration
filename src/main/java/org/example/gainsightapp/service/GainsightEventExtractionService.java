@@ -150,6 +150,7 @@ public class GainsightEventExtractionService {
                 
                 // Update pagination
                 scrollId = response.getScrollId();
+                scrollId = scrollId == "null" ? null : scrollId; // Handle null case
                 hasMore = response.isHasMore() && scrollId != null;
                 pageCount++;
                 
